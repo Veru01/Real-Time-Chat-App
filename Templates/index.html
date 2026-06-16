@@ -1,0 +1,321 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>LAN Chat</title>
+  <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: sans-serif;
+      background: #f0f2f5;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+      padding: 16px;
+    }
+    .chat-container {
+      background: white;
+      border-radius: 16px;
+      box-shadow: 0 4px 24px rgba(0,0,0,0.10);
+      width: 100%;
+      max-width: 700px;
+      display: flex;
+      flex-direction: column;
+      height: 90vh;
+      overflow: hidden;
+    }
+
+    .chat-header {
+      background: #4f46e5;
+      color: white;
+      padding: 18px 20px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .chat-header .dot {
+      width: 10px; height: 10px;
+      background: #4ade80;
+      border-radius: 50%;
+      display: inline-block;
+    }
+
+    .chat-header h2 { font-size: 18px; font-weight: 600; }
+    .chat-header span { font-size: 13px; opacity: 0.8; margin-left: auto; }
+
+    .name-bar {
+      padding: 10px 16px;
+      background: #f8f8ff;
+      border-bottom: 1px solid #e5e7eb;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 14px;
+      color: #555;
+    }
+
+    .name-bar input {
+      padding: 5px 10px;
+      border: 1px solid #d1d5db;
+      border-radius: 20px;
+      font-size: 14px;
+      outline: none;
+      width: 160px;
+      transition: border 0.2s;
+    }
+
+    .name-bar input:focus { border-color: #4f46e5; }
+
+    #messages {
+      flex: 1;
+      overflow-y: auto;
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      background: #f0f2f5;
+    }
+
+    .msg-row {
+      display: flex;
+      flex-direction: column;
+      max-width: 80%;
+    }
+
+    .msg-row.me { align-self: flex-end; align-items: flex-end; }
+    .msg-row.other { align-self: flex-start; align-items: flex-start; }
+    .msg-row.system { align-self: center; align-items: center; }
+
+    .msg-name {
+      font-size: 11px;
+      color: #888;
+      margin-bottom: 3px;
+      padding: 0 6px;
+    }
+
+    .msg-bubble {
+      padding: 9px 14px;
+      border-radius: 18px;
+      font-size: 14px;
+      line-height: 1.5;
+      word-break: break-word;
+    }
+
+    .me .msg-bubble {
+      background: #4f46e5;
+      color: white;
+      border-bottom-right-radius: 4px;
+    }
+
+.other .msg-bubble {
+      background: white;
+      color: #222;
+      border-bottom-left-radius: 4px;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+    }
+
+    .system .msg-bubble {
+      background: #e5e7eb;
+      color: #666;
+      font-size: 12px;
+      padding: 5px 14px;
+      border-radius: 20px;
+    }
+
+    .msg-time {
+      font-size: 11px;
+      color: #aaa;
+      margin-top: 3px;
+      padding: 0 6px;
+    }
+
+
+    .msg-bubble img {
+      max-width: 260px;
+      border-radius: 10px;
+      display: block;
+      margin-top: 4px;
+    }
+
+    .msg-bubble a {
+      color: inherit;
+      text-decoration: underline;
+    }
+
+    .input-bar {
+      padding: 12px 14px;
+      border-top: 1px solid #e5e7eb;
+      background: white;
+      display: flex;
+      gap: 8px;
+      align-items: center;
+    }
+
+    #msg-input {
+      flex: 1;
+      padding: 10px 16px;
+      border: 1px solid #d1d5db;
+      border-radius: 24px;
+      font-size: 14px;
+      outline: none;
+      transition: border 0.2s;
+    }
+
+    #msg-input:focus { border-color: #4f46e5; }
+
+    .btn-send {
+      background: #4f46e5;
+      color: white;
+      border: none;
+      border-radius: 50%;
+      width: 40px; height: 40px;
+      cursor: pointer;
+      font-size: 18px;
+      display: flex; align-items: center; justify-content: center;
+      transition: background 0.2s;
+      flex-shrink: 0;
+    }
+
+    .btn-send:hover { background: #4338ca; }
+
+    .btn-file {
+      background: none;
+      border: 1px solid #d1d5db;
+      border-radius: 50%;
+      width: 40px; height: 40px;
+      cursor: pointer;
+      font-size: 18px;
+      display: flex; align-items: center; justify-content: center;
+      color: #666;
+      transition: border 0.2s;
+      flex-shrink: 0;
+    }
+
+    .btn-file:hover { border-color: #4f46e5; color: #4f46e5; }
+
+    #file-input { display: none; }
+
+    @media (max-width: 500px) {
+      .chat-container { height: 100vh; border-radius: 0; }
+    }
+  </style>
+</head>
+<body>
+
+<div class="chat-container">
+
+  <div class="chat-header">
+    <span class="dot"></span>
+    <h2>LAN Chat</h2>
+    <span id="online-count">1 online</span>
+  </div>
+
+  <div class="name-bar">
+    👤 Your name:
+    <input id="username" type="text" value="User" maxlength="20" placeholder="Enter name">
+  </div>
+
+  <div id="messages"></div>
+
+  <div class="input-bar">
+    <button class="btn-file" onclick="document.getElementById('file-input').click()" title="Send file">📎</button>
+    <input type="file" id="file-input" onchange="uploadFile()">
+    <input id="msg-input" type="text" placeholder="Type a message..." onkeydown="if(event.key==='Enter')sendMsg()">
+    <button class="btn-send" onclick="sendMsg()" title="Send">➤</button>
+  </div>
+
+</div>
+
+<script>
+  const socket = io({
+  transports: ['websocket', 'polling']
+});
+  let onlineCount = 0;
+
+  function getUsername() {
+    return document.getElementById('username').value.trim() || 'Anonymous';
+  }
+
+  function addMessage({ username, message, time }, type) {
+    const myName = getUsername();
+    const div = document.getElementById('messages');
+
+    let rowClass = 'other';
+    if (type === 'system') rowClass = 'system';
+    else if (username === myName) rowClass = 'me';
+
+    const timeStr = time ? `<div class="msg-time">${time}</div>` : '';
+    const nameStr = (rowClass === 'other') ? `<div class="msg-name">${username}</div>` : '';
+
+    div.innerHTML += `
+      <div class="msg-row ${rowClass}">
+        ${nameStr}
+        <div class="msg-bubble">${message}</div>
+        ${timeStr}
+      </div>`;
+
+    div.scrollTop = div.scrollHeight;
+  }
+
+  socket.on('receive_message', data => {
+    const myName = getUsername();
+    const type = data.username === 'System' ? 'system'
+                : data.username === myName ? 'me' : 'other';
+    addMessage(data, type);
+  });
+
+
+  socket.on('file_shared', data => {
+    const myName = getUsername();
+    const isImage = /\.(png|jpg|jpeg|gif)$/i.test(data.filename);
+    const content = isImage
+      ? `<img src="${data.url}" alt="${data.filename}">`
+      : `📎 <a href="${data.url}" target="_blank">${data.filename}</a>`;
+
+    const type = data.username === myName ? 'me' : 'other';
+    const div = document.getElementById('messages');
+    const nameStr = type === 'other' ? `<div class="msg-name">${data.username}</div>` : '';
+
+    div.innerHTML += `
+      <div class="msg-row ${type}">
+        ${nameStr}
+        <div class="msg-bubble">${content}</div>
+      </div>`;
+    div.scrollTop = div.scrollHeight;
+  });
+socket.on('connect', () => {
+    onlineCount++;
+    document.getElementById('online-count').textContent = onlineCount + ' online';
+  });
+
+  socket.on('disconnect', () => {
+    if (onlineCount > 0) onlineCount--;
+    document.getElementById('online-count').textContent = onlineCount + ' online';
+  });
+
+  function sendMsg() {
+    const input = document.getElementById('msg-input');
+    const msg = input.value.trim();
+    if (!msg) return;
+    const now = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    socket.emit('send_message', { username: getUsername(), message: msg, time: now });
+    input.value = '';
+  }
+
+  function uploadFile() {
+    const file = document.getElementById('file-input').files[0];
+    if (!file) return;
+    const fd = new FormData();
+    fd.append('file', file);
+    fd.append('username', getUsername());
+    fetch('/upload', { method: 'POST', body: fd })
+      .then(() => { document.getElementById('file-input').value = ''; });
+  }
+</script>
+
+</body>
+</html>
