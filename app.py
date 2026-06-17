@@ -16,7 +16,7 @@ app.config['MAX_CONTENT_LENGTH'] = 50 * 1024 * 1024  # 50 MB max file size
 socketio = SocketIO(
     app,
     cors_allowed_origins="*",
-    async_mode='threading',
+    async_mode='gevent',
     ping_timeout=60,
     ping_interval=25
 )
@@ -206,4 +206,4 @@ if __name__ == '__main__':
     print(f"  Network: http://{local_ip}:5000")
     print("=" * 45)
     port = int(os.environ.get('PORT', 5000))
-    socketio.run(app, host='0.0.0.0', port=port, debug=False, use_reloader=False, allow_unsafe_werkzeug=True)
+    socketio.run(app, host='0.0.0.0', port=port, debug=False)
