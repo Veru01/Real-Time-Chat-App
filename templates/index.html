@@ -9,43 +9,103 @@
     * { box-sizing: border-box; margin: 0; padding: 0; }
 
     body {
-      font-family: sans-serif;
-      background: #f0f2f5;
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      min-height: 100vh;
-      padding: 16px;
-    }
+  font-family: sans-serif;
+  background: #f0f2f5;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 100vh;
+  padding: 16px;
+  margin: 0;
+}
+
     .chat-container {
-      background: white;
-      border-radius: 16px;
-      box-shadow: 0 4px 24px rgba(0,0,0,0.10);
-      width: 100%;
-      max-width: 700px;
-      display: flex;
-      flex-direction: column;
-      height: 90vh;
-      overflow: hidden;
-    }
+  background: white;
+  border-radius: 16px;
+  box-shadow: 0 4px 24px rgba(0,0,0,0.10);
+  width: 100%;
+  max-width: 700px;
+  display: flex;
+  flex-direction: column;
+  height: 90vh;
+  overflow: hidden;
+  margin: 0 auto;
+}
 
     .chat-header {
-      background: #4f46e5;
-      color: white;
-      padding: 18px 20px;
-      display: flex;
-      align-items: center;
-      gap: 12px;
-    }
+  background: #4f46e5;
+  color: white;
+  padding: 14px 20px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  justify-content: center;
+  position: relative;
+}
+
     .chat-header .dot {
       width: 10px; height: 10px;
       background: #4ade80;
       border-radius: 50%;
-      display: inline-block;
+      flex-shrink: 0;
     }
 
     .chat-header h2 { font-size: 18px; font-weight: 600; }
-    .chat-header span { font-size: 13px; opacity: 0.8; margin-left: auto; }
+
+    .online-pill {
+  background: rgba(255,255,255,0.2);
+  border-radius: 20px;
+  padding: 4px 10px;
+  font-size: 13px;
+  cursor: pointer;
+  position: absolute;
+  right: 16px;
+  user-select: none;
+}
+    .online-pill:hover .online-dropdown {
+      display: block;
+    }
+
+    .online-dropdown {
+      display: none;
+      position: absolute;
+      top: 110%;
+      right: 0;
+      background: white;
+      color: #333;
+      border-radius: 10px;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+      min-width: 160px;
+      padding: 8px 0;
+      z-index: 100;
+    }
+
+    .online-dropdown .dropdown-title {
+      font-size: 11px;
+      color: #888;
+      padding: 4px 14px 6px;
+      border-bottom: 1px solid #f0f0f0;
+      margin-bottom: 4px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .online-dropdown .user-item {
+      padding: 6px 14px;
+      font-size: 13px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .online-dropdown .user-item::before {
+      content: '';
+      width: 7px; height: 7px;
+      background: #4ade80;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
 
     .name-bar {
       padding: 10px 16px;
@@ -88,7 +148,7 @@
 
     .msg-row.me { align-self: flex-end; align-items: flex-end; }
     .msg-row.other { align-self: flex-start; align-items: flex-start; }
-    .msg-row.system { align-self: center; align-items: center; }
+    .msg-row.system { align-self: center; align-items: center; max-width: 100%; }
 
     .msg-name {
       font-size: 11px;
@@ -111,7 +171,7 @@
       border-bottom-right-radius: 4px;
     }
 
-.other .msg-bubble {
+    .other .msg-bubble {
       background: white;
       color: #222;
       border-bottom-left-radius: 4px;
@@ -133,7 +193,6 @@
       padding: 0 6px;
     }
 
-
     .msg-bubble img {
       max-width: 260px;
       border-radius: 10px;
@@ -141,10 +200,7 @@
       margin-top: 4px;
     }
 
-    .msg-bubble a {
-      color: inherit;
-      text-decoration: underline;
-    }
+    .msg-bubble a { color: inherit; text-decoration: underline; }
 
     .input-bar {
       padding: 12px 14px;
@@ -196,7 +252,6 @@
     }
 
     .btn-file:hover { border-color: #4f46e5; color: #4f46e5; }
-
     #file-input { display: none; }
 
     @media (max-width: 500px) {
@@ -211,12 +266,21 @@
   <div class="chat-header">
     <span class="dot"></span>
     <h2>LAN Chat</h2>
-    <span id="online-count">1 online</span>
+    <div class="online-pill">
+      <span id="online-count">1</span> online
+      <div class="online-dropdown">
+        <div class="dropdown-title">Online now</div>
+        <div id="online-names-list"></div>
+      </div>
+    </div>
   </div>
 
   <div class="name-bar">
     👤 Your name:
-    <input id="username" type="text" value="User" maxlength="20" placeholder="Enter name">
+    <input id="username" type="text" value="User" maxlength="20"
+           placeholder="Enter name"
+           onchange="updateUsername()"
+           onblur="updateUsername()">
   </div>
 
   <div id="messages"></div>
@@ -232,80 +296,87 @@
 
 <script>
   const socket = io({
-  transports: ['websocket', 'polling']
-});
-  let onlineCount = 0;
+    transports: ['websocket', 'polling']
+  });
 
   function getUsername() {
     return document.getElementById('username').value.trim() || 'Anonymous';
   }
 
-  function addMessage({ username, message, time }, type) {
+  function updateUsername() {
+    socket.emit('set_username', { username: getUsername() });
+  }
+
+  // ── Online users list ──
+  socket.on('online_update', data => {
+    document.getElementById('online-count').textContent = data.count;
+    const list = document.getElementById('online-names-list');
+    list.innerHTML = data.names
+      .map(name => `<div class="user-item">${name}</div>`)
+      .join('');
+  });
+
+  // ── Messages ──
+  socket.on('receive_message', data => {
     const myName = getUsername();
     const div = document.getElementById('messages');
 
     let rowClass = 'other';
-    if (type === 'system') rowClass = 'system';
-    else if (username === myName) rowClass = 'me';
+    if (data.username === 'System') rowClass = 'system';
+    else if (data.username === myName) rowClass = 'me';
 
-    const timeStr = time ? `<div class="msg-time">${time}</div>` : '';
-    const nameStr = (rowClass === 'other') ? `<div class="msg-name">${username}</div>` : '';
+    const timeStr = data.time ? `<div class="msg-time">${data.time}</div>` : '';
+    const nameStr = rowClass === 'other' ? `<div class="msg-name">${data.username}</div>` : '';
 
     div.innerHTML += `
       <div class="msg-row ${rowClass}">
         ${nameStr}
-        <div class="msg-bubble">${message}</div>
+        <div class="msg-bubble">${data.message}</div>
         ${timeStr}
       </div>`;
 
     div.scrollTop = div.scrollHeight;
-  }
-
-  socket.on('receive_message', data => {
-    const myName = getUsername();
-    const type = data.username === 'System' ? 'system'
-                : data.username === myName ? 'me' : 'other';
-    addMessage(data, type);
   });
 
-
+  // ── File shared ──
   socket.on('file_shared', data => {
     const myName = getUsername();
-    const isImage = /\.(png|jpg|jpeg|gif)$/i.test(data.filename);
-    const content = isImage
-      ? `<img src="${data.url}" alt="${data.filename}">`
-      : `📎 <a href="${data.url}" target="_blank">${data.filename}</a>`;
+    const isImage = /\.(png|jpg|jpeg|gif|webp)$/i.test(data.filename);
+    const isVideo = /\.(mp4|mkv|avi|mov)$/i.test(data.filename);
+
+    let content = '';
+    if (isImage) {
+      content = `<img src="${data.url}" alt="${data.filename}">`;
+    } else if (isVideo) {
+      content = `<video src="${data.url}" controls style="max-width:260px;border-radius:10px;display:block;margin-top:4px"></video>`;
+    } else {
+      content = `📎 <a href="${data.url}" target="_blank">${data.filename}</a>`;
+    }
 
     const type = data.username === myName ? 'me' : 'other';
     const div = document.getElementById('messages');
     const nameStr = type === 'other' ? `<div class="msg-name">${data.username}</div>` : '';
+    const timeStr = data.time ? `<div class="msg-time">${data.time}</div>` : '';
 
     div.innerHTML += `
       <div class="msg-row ${type}">
         ${nameStr}
         <div class="msg-bubble">${content}</div>
+        ${timeStr}
       </div>`;
     div.scrollTop = div.scrollHeight;
   });
-socket.on('connect', () => {
-    onlineCount++;
-    document.getElementById('online-count').textContent = onlineCount + ' online';
-  });
 
-  socket.on('disconnect', () => {
-    if (onlineCount > 0) onlineCount--;
-    document.getElementById('online-count').textContent = onlineCount + ' online';
-  });
-
+  // ── Send message ──
   function sendMsg() {
     const input = document.getElementById('msg-input');
     const msg = input.value.trim();
     if (!msg) return;
-    const now = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-    socket.emit('send_message', { username: getUsername(), message: msg, time: now });
+    socket.emit('send_message', { username: getUsername(), message: msg });
     input.value = '';
   }
 
+  // ── Upload file ──
   function uploadFile() {
     const file = document.getElementById('file-input').files[0];
     if (!file) return;
@@ -315,6 +386,11 @@ socket.on('connect', () => {
     fetch('/upload', { method: 'POST', body: fd })
       .then(() => { document.getElementById('file-input').value = ''; });
   }
+
+  // ── Set username on connect ──
+  socket.on('connect', () => {
+    updateUsername();
+  });
 </script>
 
 </body>
