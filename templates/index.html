@@ -295,10 +295,12 @@
 </div>
 
 <script>
+  // ── 1. Initialize socket FIRST ──
   const socket = io({
     transports: ['websocket', 'polling']
   });
 
+  // ── 2. Helper functions ──
   function getUsername() {
     return document.getElementById('username').value.trim() || 'Anonymous';
   }
@@ -307,7 +309,48 @@
     socket.emit('set_username', { username: getUsername() });
   }
 
-  // ── Online users list ──
+  // ── 3. Send message ──
+  function sendMsg() {
+    const input = document.getElementById('msg-input');
+    const msg = input.value.trim();
+    if (!msg) return;
+    const username = getUsername();
+    if (!username || username === 'Anonymous') {
+      alert('Please enter your name first!');
+      document.getElementById('username').focus();
+      return;
+    }
+    socket.emit('send_message', { username: username, message: msg });
+    input.value = '';
+  }
+
+  // ── 4. Upload file ──
+  function uploadFile() {
+    const file = document.getElementById('file-input').files[0];
+    if (!file) return;
+    const fd = new FormData();
+    fd.append('file', file);
+    fd.append('username', getUsername());
+    fetch('/upload', { method: 'POST', body: fd })
+      .then(() => { document.getElementById('file-input').value = ''; });
+  }
+
+  // ── 5. Connection events ──
+  socket.on('connect', () => {
+    document.getElementById('connection-banner').style.display = 'none';
+    document.getElementById('loading-screen').style.display = 'none';
+    updateUsername();
+  });
+
+  socket.on('disconnect', () => {
+    document.getElementById('connection-banner').style.display = 'block';
+  });
+
+  socket.on('connect_error', () => {
+    document.getElementById('connection-banner').style.display = 'block';
+  });
+
+  // ── 6. Online users ──
   socket.on('online_update', data => {
     document.getElementById('online-count').textContent = data.count;
     const list = document.getElementById('online-names-list');
@@ -316,7 +359,7 @@
       .join('');
   });
 
-  // ── Messages ──
+  // ── 7. Receive message ──
   socket.on('receive_message', data => {
     const myName = getUsername();
     const div = document.getElementById('messages');
@@ -338,7 +381,7 @@
     div.scrollTop = div.scrollHeight;
   });
 
-  // ── File shared ──
+  // ── 8. File shared ──
   socket.on('file_shared', data => {
     const myName = getUsername();
     const isImage = /\.(png|jpg|jpeg|gif|webp)$/i.test(data.filename);
@@ -365,31 +408,6 @@
         ${timeStr}
       </div>`;
     div.scrollTop = div.scrollHeight;
-  });
-
-  // ── Send message ──
-  function sendMsg() {
-    const input = document.getElementById('msg-input');
-    const msg = input.value.trim();
-    if (!msg) return;
-    socket.emit('send_message', { username: getUsername(), message: msg });
-    input.value = '';
-  }
-
-  // ── Upload file ──
-  function uploadFile() {
-    const file = document.getElementById('file-input').files[0];
-    if (!file) return;
-    const fd = new FormData();
-    fd.append('file', file);
-    fd.append('username', getUsername());
-    fetch('/upload', { method: 'POST', body: fd })
-      .then(() => { document.getElementById('file-input').value = ''; });
-  }
-
-  // ── Set username on connect ──
-  socket.on('connect', () => {
-    updateUsername();
   });
 </script>
 
